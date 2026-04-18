@@ -73,7 +73,8 @@ Authorization: Basic admin admin123
 W tym wariancie rozbudowujemy naszą aplikację o bardziej realistyczny model bezpieczeństwa: nie wszystko jest chronione, ale wybrane zasoby wymagają logowania. To dokładnie ten scenariusz, który spotykasz w prawdziwych systemach:
 - `/external` → dostępny dla każdego
 - `/internal` → tylko dla zalogowanych użytkowników
-Dzięki temu studenci zobaczą, jak Spring Security precyzyjnie steruje dostępem do poszczególnych części API.
+
+Dzięki temu widzimy, jak Spring Security precyzyjnie steruje dostępem do poszczególnych części API.
 
 ### ✨ 1. Dodaj endpoint publiczny
 
