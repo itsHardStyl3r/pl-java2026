@@ -906,7 +906,7 @@ przy użyciu id klienta: `user-service-client-keycloak`
 i `client_secret` oraz realm'u `train-trips-realm`:
 
 ```http
-POST http://localhost:8999/realms/master/protocol/openid-connect/token
+POST http://localhost:8999/realms/<realm_name>/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 client_id=user-service-client-keycloak &
@@ -1087,7 +1087,7 @@ public class UserServiceClientKeycloakApplication {
                     .map(AbstractUserRepresentation::getUsername)
                     .toList();
 
-            System.out.println("Users in Keycloak realm 'master': " + usernames);
+            System.out.println("Users in Keycloak in realm : " + usernames);
         };
     }
 }
@@ -1134,6 +1134,7 @@ Root Token: s.xxxxxxxx
 
 - Zapisz go — to Twój token administracyjny.
 - Pamiętaj: konfiguracja w CLI jest jednorazowo
+- Vault jest teraz gotowy do użycia ale najpierw w nowej instancji terminala dodaj `export VAULT_ADDR='http://127.0.0.1:8200'`
 
 ### 3. Włączenie silnika sekretów (KV)
 
@@ -1170,13 +1171,32 @@ password: SuperTajneHaslo123
 
 ### 6. Użycie Vault w aplikacji (Spring Boot)
 
-Dodaj zależność:
+Dodaj zależności:
 
 ```xml
 <dependency>
   <groupId>org.springframework.cloud</groupId>
   <artifactId>spring-cloud-starter-vault-config</artifactId>
 </dependency>
+```
+
+Może też brakować:
+```xml
+	<properties>
+		<java.version>21</java.version>
+		<spring-cloud.version>2025.1.1</spring-cloud.version>
+	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 ```
 
 Konfiguracja `application.yaml`:
@@ -1229,7 +1249,7 @@ Przetestuj poprzez wyświetlenie hasła w `CommandLineRunner`:
 
 ```java
 @Bean
-CommandLineRunner commandLineRunner(Environment environment) {
+CommandLineRunner commandLineRunner() {
     return args -> {
         
         System.out.println("Moje hasło to: " + password);
