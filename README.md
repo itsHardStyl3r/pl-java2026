@@ -1,4 +1,4 @@
-# PŁ: Zaawansowane Zagadnienia Programowania w Javie - Edycja 2026
+# PŁ: Zaawansowane Zagadnienia Programowania w Javie — Edycja 2026
 
 ## Zaliczenie
 
@@ -67,9 +67,9 @@
 | 9  | 11.05          | Spring AOP                                                                                                                             |                                                                                      |
 | 10 | 18.05          | From Java to Go                                                                                                                        | [Materiały na zajęcia](java-to-go%2FREADME.MD)                                       |
 | 11 | 25.05          | Sprawdzanie postępu realizacji projektu                                                                                                |                                                                                      |
-| 12 | 1.06           |                                                                                                                                        |                                                                                      |
-| 13 | 8.06           |                                                                                                                                        |                                                                                      |
-| 14 | 15.06          |                                                                                                                                        |                                                                                      |
+| 12 | 1.06           | JDK Updates (od wersji 9 do wersji 25)                                                                                                 |                                                                                      |
+| 13 | 8.06           | LLM                                                                                                                                    |                                                                                      |
+| 14 | 15.06          | Refleksja, Classloader, Annotation Processing                                                                                          |                                                                                      |
 | 15 | 22.06          | Finalne przedstawienie zrealizowanego projektu                                                                                         |                                                                                      |
 
 ## Ankiety
