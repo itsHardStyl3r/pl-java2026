@@ -1,10 +1,10 @@
-package com.example;
+//package com.example;
 
-public class Sandbox {
+//public class Sandbox {
 //    public static void main(String[] args) {
 //    }
 
-    void main() {
-        System.out.println("Hello World!");
-    }
+void main() {
+    IO.println("Hello World!");
 }
+//}
