@@ -149,21 +149,22 @@ Przed java10, należało użyć metody `isPresent`, bo inaczej narażalismy się
 oraz ostrzeżenie (warning). Po dodaniu `orElseThrow`, "zapachy kodu" jest lepsze:
 
 ```java
-public static void main(String[] args) {
-    Optional<String> result = getResult();
-    //before orElseThrow
-    if (result.isPresent()) {
-        String s = result.get();
-        System.out.println(s);
-    }
-    //after
-    String s = result.orElseThrow();
-    System.out.println(s);
+void main() {
+
+  Optional<String> result = getResult();
+
+  result.ifPresent(s -> System.out.println("isPresent: " + s));
+
+  result.ifPresentOrElse(
+          s1 -> System.out.println("jest wartość: " + s1),
+          () -> System.out.println("wyświetlam wartość zastępczą")
+  );
+  
 }
 
-private static Optional<String> getResult() {
-    //return Optional.of("any value");
-    return Optional.empty();
+Optional<String> getResult() {
+  //return Optional.of("aaa");
+  return Optional.empty();
 }
 ```
 
@@ -498,6 +499,109 @@ private static void switchEvolution(Object object) {
 
 Na początku "łącznikiem" (w java17 jako preview) w wyrazeniu `case` na połączenie "pattern matching" oraz "quarded
 patterns" był `&&`, potem zamieniono na słowo kluczowe `when`. Czy tak się stanie w przypadku `instanceof`? Zobaczymy...
+
+### Co dalej
+Trwają prace nad rozszerzeniem tego mechanizmu na **typy prymitywne** (*Primitive Types in Patterns, instanceof, and switch*).
+
+Dzisiaj możemy napisać:
+
+```java
+switch (value) {
+    case 1 -> System.out.println("one");
+    case 2 -> System.out.println("two");
+}
+```
+
+ale nie możemy traktować typu prymitywnego jako wzorca:
+
+```java
+// kierunek rozwoju (preview)
+switch (value) {
+    case int i -> System.out.println(i);
+    case long l -> System.out.println(l);
+}
+```
+
+albo:
+
+```java
+if (value instanceof int i) {
+    ...
+}
+```
+
+---
+
+### Po co to wprowadzają?
+
+Od kilku lat rozwój Javy zmierza do stworzenia **jednolitego modelu Pattern Matchingu**.
+
+Dzisiaj mamy pewną niespójność:
+
+```java
+Object obj = 10;
+
+if (obj instanceof Integer i) {
+    System.out.println(i);
+}
+```
+
+działa.
+
+Ale:
+
+```java
+int value = 10;
+
+if (value instanceof int i) {
+    ...
+}
+```
+
+nie działa.
+
+Twórcy Javy chcą, żeby Pattern Matching był możliwie spójny dla:
+
+* obiektów,
+* rekordów,
+* klas sealed,
+* typów prymitywnych.
+
+---
+
+### Ciekawy przykład
+
+Docelowo możliwe ma być coś takiego:
+
+```java
+switch (number) {
+    case int i when i > 0 ->
+            System.out.println("positive int");
+
+    case int i ->
+            System.out.println("negative int");
+
+    case long l ->
+            System.out.println("long");
+}
+```
+
+Widać tu połączenie:
+
+* Pattern Matching,
+* `switch`,
+* typów prymitywnych,
+* `when` (guarded patterns).
+
+
+### Czy to już jest w Javie 26?
+
+Tak, ale nadal jako **Preview Feature**
+
+> Jednym z aktywnie rozwijanych obszarów Project Amber jest rozszerzenie Pattern Matchingu na typy prymitywne (`int`, `long`, `double`, `boolean` itd.), tak aby mechanizm dopasowywania wzorców był spójny dla wszystkich typów dostępnych w języku Java.
+
+To bardzo dobrze pokazuje, że Project Amber nie jest zakończonym projektem, lecz nadal konsekwentnie rozwija ideę Pattern Matchingu rozpoczętą od `instanceof`, następnie rozszerzoną na `switch`, rekordy i klasy `sealed`.
+
 
 ## Rekordy
 
