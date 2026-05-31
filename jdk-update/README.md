@@ -712,51 +712,21 @@ record Person(Long id, String username) {
 
 - Oba rozwiązania eliminują nadmiarowość kodu (ang. boilerplate code)
 - Rekordy są do małych, niemutowalnych klas
-- Dla klas z dużą ilością pól, Lombok może wygenerować wzorzec buildera
+- Dla klas z dużą ilością pól Lombok może wygenerować wzorzec buildera
 - Klasy z adnotacjami Lomboka są mutowalne
 - Rekordy nie wspierają dziedziczenia
 
 
 ### Record Patterns
 
-Przed:
-
 ```java
-if (obj instanceof Person p) {
-    String name = p.name();
-    int age = p.age();
-}
+    Object obj = new Person(1L, "Test");
+
+    if (obj instanceof Person(Long id, String username)) {
+        System.out.println(username);
+    }
 ```
 
-Po:
-
-```java
-if (obj instanceof Person(String name, int age)) {
-    System.out.println(name);
-}
-```
-
-Zagnieżdżone rekordy:
-
-```java
-record Address(String city) {}
-record Person(String name, Address address) {}
-
-if (obj instanceof Person(
-        String name,
-        Address(String city))) {
-
-    System.out.println(city);
-}
-```
-
-Najważniejszy przekaz:
-
-* Records → przechowywanie danych
-* Pattern Matching → rozpoznawanie typów
-* Record Patterns → rozbijanie obiektów na części
-
-To jest jeden z najlepszych przykładów pokazujących, jak kolejne funkcje Project Amber zaczęły ze sobą współpracować.
 
 ## Klasy `sealed` i dziedziczenie
 - Oznaczając zajęcia jako `final`, zapobiegamy **całkowicie** dziedziczeniu
@@ -793,7 +763,7 @@ class GeometricalOperations {
   // do nothing
 }
 ```
-1. Dodajemy słowo kluczowe `permits` to klasy `Shapeable` i ograniczamy do klasy `Shape`, która powinna się oznaczyć jako `non-sealed`
+1. Dodajemy słowo kluczowe `permits` do interfejsu `Shapeable` i ograniczamy do klasy `Shape`, która powinna się oznaczyć jako `non-sealed`
 2. Zmieniamy przy klasie `Shape` na `sealed` i dodajemy `permits Circle, Triangle`
 ```java
 abstract sealed class Shape implements Shapeable permits Circle, Triangle {
@@ -808,7 +778,7 @@ boolean sealed = Shape.class.isSealed();
 Class<?>[] permittedSubclasses = Shape.class.getPermittedSubclasses();
 ```
 
-### Kontekstowe słowa kluczowe (ang. Contextual Keywords)
+## Kontekstowe słowa kluczowe (ang. Contextual Keywords)
 
 Wprowadzenie nowych słów kluczowych, takich jak `sealed`, `non-sealed`, `permits` (lub `switch`) zrodziło wśród
 programistów JDK następujące pytanie: Co powinno się stać z istniejącym kodem, który używa tych słów kluczowych jako
@@ -889,56 +859,142 @@ URL url_new = URI.create("http://github.com").toURL();
 ```
 
 
+## Stream Gatherers (Rozszerzalne API strumieni)
+
+Rewolucja w Stream API. Pozwala na definiowanie niestandardowych operacji pośrednich (*intermediate operations*), 
+których brakuje w standardowym API (np. okienkowanie, grupowanie w stałe paczki, transformacje stanowe). Pozwala tworzyć własne 
+operacje pośrednie (`intermediate operations`) działające podobnie jak `map()`, `filter()` czy `flatMap()`. 
+Dzięki nim można implementować bardziej złożone przetwarzanie danych bez konieczności wychodzenia poza Stream API. 
+Gatherers umożliwiają m.in. analizę wielu elementów jednocześnie, utrzymywanie stanu pomiędzy elementami oraz generowanie 
+dowolnej liczby wyników dla pojedynczego elementu wejściowego.
+* **Java 22** – jako Preview Feature
+* **Java 24** – jako funkcjonalność standardowa (JEP 485)
 
 ---
 
-### Stream Gatherers (Rozszerzalne API Strumieni)
+### Przykład 1 – grupowanie elementów po 3
 
-Rewolucja w Stream API. Pozwala na definiowanie niestandardowych operacji pośrednich (*intermediate operations*), których brakuje w standardowym API (np. okienkowanie, grupowanie w stałe paczki, transformacje stanowe).
-
-**Od Java 24 (Weszło na stałe - JEP 485, Marzec 2025):**
+Przed Gatherers:
 
 ```java
-// Przykład użycia wbudowanego modułu zbierającego do tworzenia stałych okien (fixed windows)
-List<Integer> numbers = List.of(1, 2, 3, 4, 5, 6, 7, 8);
-
-List<List<Integer>> windows = numbers.stream()
-    .gather(Gatherers.windowFixed(3))
-    .toList();
-
-System.out.println(windows); // Wyjdzie: [[1, 2, 3], [4, 5, 6], [7, 8]]
-
-```
-
----
-
-## Funkcje w trybie Preview (Stan na JDK 26 / Rok 2026)
-
-### Klasy deklarowane niejawnie i instancyjne metody `main` (Płynne wprowadzenie do Javy)
-
-Inicjatywa mająca na celu ułatwienie nauki języka oraz pisania prostych skryptów/narzędzi poprzez odchudzenie protokołu startowego (Launch Protocol). Początkujący nie musi pisać `public static void main(String[] args)` ani owijać kodu w sztywną klasę.
-
-**Status: Kolejne podglądy (Preview) w JDK 21-25+, dążące do pełnej standaryzacji.**
-
-```java
-// Cała zawartość pliku HelloWorld.java:
-
-void main() {
-    System.out.println("Witaj w nowoczesnej Javie!");
+List<List<Integer>> result = new ArrayList<>();
+for (int i = 0; i < numbers.size(); i += 3) {
+    result.add(numbers.subList(
+            i,
+            Math.min(i + 3, numbers.size())
+    ));
 }
-
 ```
 
-Uruchomienie skryptu z poziomu terminala:
+Java 24:
 
-```bash
-java --enable-preview --source 26 HelloWorld.java
+```java
+numbers.stream()
+       .gather(Gatherers.windowFixed(3))
+       .forEach(System.out::println);
+```
 
+Wynik:
+
+```text
+[1, 2, 3]
+[4, 5, 6]
+[7, 8, 9]
 ```
 
 ---
 
-### Elastyczne ciała konstruktorów (Flexible Constructor Bodies)
+### Przykład 2 – okno przesuwne (Sliding Window)
+
+```java
+Stream.of(1, 2, 3, 4, 5)
+      .gather(Gatherers.windowSliding(3))
+      .forEach(System.out::println);
+```
+
+Wynik:
+
+```text
+[1, 2, 3]
+[2, 3, 4]
+[3, 4, 5]
+```
+
+Przydatne np. przy analizie danych czasowych, kursów giełdowych czy pomiarów z czujników.
+
+---
+
+### Przykład 3 – usuwanie kolejnych duplikatów
+
+```java
+Stream.of("A", "A", "B", "B", "C", "A")
+      .gather(Gatherers.fold(
+              () -> "",
+              (last, current, downstream) -> {
+                  if (!current.equals(last)) {
+                      downstream.push(current);
+                  }
+                  return current;
+              }))
+      .forEach(System.out::println);
+```
+
+Wynik:
+
+```text
+A
+B
+C
+A
+```
+
+## Klasa `IO` (Java 25)
+
+Java 25 wprowadziła nową klasę `IO`, której celem jest uproszczenie podstawowych operacji wejścia i wyjścia wykonywanych z poziomu konsoli. 
+Klasa udostępnia statyczne metody takie jak `print()`, `println()` oraz `readln()`, eliminując konieczność korzystania z bardziej rozbudowanych 
+konstrukcji opartych na `System.out` i `Scanner`. Funkcjonalność ta powstała głównie z myślą o początkujących programistach oraz tworzeniu niewielkich 
+programów i skryptów konsolowych.
+
+Przed Java 25:
+
+```java
+Scanner scanner = new Scanner(System.in);
+
+System.out.print("Podaj imię: ");
+String name = scanner.nextLine();
+
+System.out.println("Witaj " + name);
+```
+
+Java 25:
+
+```java
+String name = IO.readln("Podaj imię: ");
+
+IO.println("Witaj " + name);
+```
+
+Najważniejsze metody:
+
+```java
+IO.print("tekst");
+IO.println("tekst");
+IO.readln();
+IO.readln("Podaj dane: ");
+```
+
+
+
+> W połączeniu z uproszczonym `main()` program „Hello World” można w Javie 25 zapisać jako:
+
+```java
+void main() {
+    IO.println("Hello World");
+}
+```
+
+
+## Elastyczne ciała konstruktorów (Flexible Constructor Bodies)
 
 Pozwala na umieszczenie instrukcji *przed* wywołaniem `super(...)` lub `this(...)` w konstruktorze, pod warunkiem, że instrukcje te nie odwołują się do tworzonej instancji (`this`). Ułatwia to walidację argumentów lub wstępne obliczenia przed inicjalizacją klasy bazowej.
 
@@ -956,10 +1012,8 @@ public class SubClass extends BaseClass {
 
 ```
 
+---
 
-To będzie dość obszerny materiał, więc zacznę od dwóch najważniejszych tematów (Virtual Threads i Structured Concurrency) w formie zbliżonej do stylu Twojego pliku. Potem dodam krótsze, ale nadal szczegółowe sekcje dla Scoped Values, Garbage Collectorów i Record Patterns.
-
-Moim zdaniem te fragmenty można wkleić niemal bezpośrednio do `amber.md`.
 
 # Virtual Threads (Project Loom)
 
