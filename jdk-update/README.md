@@ -870,28 +870,30 @@ dowolnej liczby wyników dla pojedynczego elementu wejściowego.
 * **Java 22** – jako Preview Feature
 * **Java 24** – jako funkcjonalność standardowa (JEP 485)
 
----
-
-### Przykład 1 – grupowanie elementów po 3
+### Przykład – grupowanie elementów po 3
 
 Przed Gatherers:
 
 ```java
-List<List<Integer>> result = new ArrayList<>();
-for (int i = 0; i < numbers.size(); i += 3) {
-    result.add(numbers.subList(
-            i,
-            Math.min(i + 3, numbers.size())
-    ));
-}
+    var numbers = List.of(1,2,3,4,5,6,7,8,9);
+    List<List<Integer>> result = new ArrayList<>();
+    for (int i = 0; i < numbers.size(); i += 3) {
+        result.add(numbers.subList(
+                           i,
+                   Math.min(i + 3, numbers.size())
+        ));
+        }
+
+        IO.println(result);
 ```
 
 Java 24:
 
 ```java
-numbers.stream()
-       .gather(Gatherers.windowFixed(3))
-       .forEach(System.out::println);
+    var numbers = List.of(1, 2, 3, 4, 5, 6, 7, 8, 9);
+List<List<Integer>> result = numbers.stream()
+        .gather(Gatherers.windowFixed(3)).collect(Collectors.toList());
+    IO.println(result);
 ```
 
 Wynik:
@@ -902,53 +904,10 @@ Wynik:
 [7, 8, 9]
 ```
 
----
 
-### Przykład 2 – okno przesuwne (Sliding Window)
+## JDK 25
 
-```java
-Stream.of(1, 2, 3, 4, 5)
-      .gather(Gatherers.windowSliding(3))
-      .forEach(System.out::println);
-```
-
-Wynik:
-
-```text
-[1, 2, 3]
-[2, 3, 4]
-[3, 4, 5]
-```
-
-Przydatne np. przy analizie danych czasowych, kursów giełdowych czy pomiarów z czujników.
-
----
-
-### Przykład 3 – usuwanie kolejnych duplikatów
-
-```java
-Stream.of("A", "A", "B", "B", "C", "A")
-      .gather(Gatherers.fold(
-              () -> "",
-              (last, current, downstream) -> {
-                  if (!current.equals(last)) {
-                      downstream.push(current);
-                  }
-                  return current;
-              }))
-      .forEach(System.out::println);
-```
-
-Wynik:
-
-```text
-A
-B
-C
-A
-```
-
-## Klasa `IO` (Java 25)
+### Klasa `IO` (Java 25)
 
 Java 25 wprowadziła nową klasę `IO`, której celem jest uproszczenie podstawowych operacji wejścia i wyjścia wykonywanych z poziomu konsoli. 
 Klasa udostępnia statyczne metody takie jak `print()`, `println()` oraz `readln()`, eliminując konieczność korzystania z bardziej rozbudowanych 
@@ -994,430 +953,173 @@ void main() {
 ```
 
 
-## Elastyczne ciała konstruktorów (Flexible Constructor Bodies)
+### Elastyczne ciała konstruktorów (Flexible Constructor Bodies)
 
-Pozwala na umieszczenie instrukcji *przed* wywołaniem `super(...)` lub `this(...)` w konstruktorze, pod warunkiem, że instrukcje te nie odwołują się do tworzonej instancji (`this`). Ułatwia to walidację argumentów lub wstępne obliczenia przed inicjalizacją klasy bazowej.
-
-**Status: Kolejne preview w JDK 22-25+ (dawniej pod nazwą Statements before super).**
+Pozwala na umieszczenie instrukcji *przed* wywołaniem `super(...)` lub `this(...)` w konstruktorze, pod warunkiem że instrukcje 
+te nie odwołują się do tworzonej instancji (`this`). Ułatwia to walidację argumentów lub wstępne obliczenia przed inicjalizacją klasy bazowej.
 
 ```java
-public class SubClass extends BaseClass {
-    public SubClass(int value) {
-        if (value < 0) throw new IllegalArgumentException("Wartość ujemna!");
-        int calculatedValue = value * 42;
-        
-        super(calculatedValue); // Wywołanie super nie musi być pierwszą instrukcją!
+class BaseClass {
+  private String name;
+  private int value;
+  public BaseClass(String name, int value) {
+    this.value = value;
+    this.name = name;
+  }
+}
+
+class SubClass extends BaseClass {
+  private String subName;
+
+  public SubClass(String name, int value, String subName) {
+    if(name.isEmpty() || subName.isEmpty()) {
+      throw new IllegalArgumentException("Name and subName cannot be empty");
     }
-}
 
+    if(value < 0) {
+      throw new IllegalArgumentException("Value cannot be negative");
+    }
+    super(name, value);
+    this.subName = subName;
+  }
+}
 ```
 
----
+### Nienazwane zmienne i wzorce (Unnamed Variables i Unnamed Patterns)
 
+#### Problem tradycyjnych importów
 
-# Virtual Threads (Project Loom)
-
-## Problem tradycyjnych wątków
-
-Przez ponad 25 lat podstawowym mechanizmem współbieżności w Javie były wątki systemowe (ang. Platform Threads).
-
-Każdy obiekt klasy `Thread` był mapowany praktycznie 1:1 na wątek systemu operacyjnego.
+Przez wiele lat Java wymagała importowania poszczególnych klas:
 
 ```java
-Thread thread = new Thread(() -> {
-    System.out.println("Hello");
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashMap;
+import java.util.ArrayList;
+```
+
+W większych plikach liczba importów potrafiła być bardzo duża.
+
+#### Import pakietu
+
+Możliwe było również:
+
+```java
+import java.util.*;
+```
+
+Rozwiązanie to miało jednak pewne wady:
+
+* obejmowało tylko jeden pakiet,
+* nie importowało podpakietów,
+* nie było powiązane z systemem modułów JPMS.
+
+#### Module Import Declarations
+
+Java 25 wprowadziła możliwość importowania całego modułu.
+
+Przykład:
+
+```java
+import module java.base;
+```
+
+lub:
+
+```java
+import module java.sql;
+```
+
+#### Co oznacza moduł?
+
+Od Java 9 platforma została podzielona na moduły.
+
+Przykładowo:
+
+| Moduł           | Zawartość                             |
+| --------------- | ------------------------------------- |
+| `java.base`     | String, Collections, Stream, Optional |
+| `java.sql`      | JDBC                                  |
+| `java.xml`      | XML API                               |
+| `java.net.http` | HttpClient                            |
+
+#### Przykład
+
+Przed:
+
+```java
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Optional;
+```
+
+Po:
+
+```java
+import module java.base;
+```
+
+Wszystkie eksportowane klasy modułu stają się dostępne. W dużych projektach biznesowych nadal często preferowane będą klasyczne importy, 
+ponieważ pozwalają precyzyjnie kontrolować zależności i łatwiej analizować używane klasy.
+
+
+### Reorganizacja importów (Module Import Declarations)
+
+* **Unnamed Variables** pozwalają oznaczyć zmienną, której wartość nie będzie wykorzystywana w dalszej części programu.
+* Zamiast nadawać sztuczne nazwy takie jak `ignored`, `unused` czy `dummy`, programista może użyć pojedynczego znaku podkreślenia (`_`).
+* Funkcjonalność zwiększa czytelność kodu, ponieważ od razu wskazuje, że dana wartość jest celowo ignorowana.
+* Może być stosowana m.in. w parametrach lambd, blokach `try-with-resources`, obsłudze wyjątków oraz Pattern Matchingu.
+* Jest częścią projektu Project Amber, którego celem jest ograniczanie ilości kodu szablonowego (*boilerplate code*).
+* Funkcjonalność jest dostępna jako **Preview Feature od Java 22** (JEP 456).
+
+#### Przykład 1 – nieużywany parametr w wyrażeniu lambda
+
+Przed:
+
+```java
+button.addActionListener(event -> {
+    refreshData();
 });
-
-thread.start();
 ```
 
-Rozwiązanie to działa bardzo dobrze dla niewielkiej liczby zadań, jednak w nowoczesnych aplikacjach serwerowych pojawił się problem skalowalności.
-
-Przykład:
-
-* aplikacja REST
-* 10 000 jednoczesnych użytkowników
-* każdy request wykonuje zapytanie do bazy danych
-
-Przy klasycznych wątkach potrzebowalibyśmy tysięcy wątków systemowych.
-
-Każdy taki wątek:
-
-* zajmuje pamięć (stos)
-* jest zarządzany przez system operacyjny
-* wymaga kosztownego przełączania kontekstu (context switching)
-
-W praktyce większość aplikacji kończyła z pulą:
+Po:
 
 ```java
-ExecutorService executor =
-        Executors.newFixedThreadPool(200);
-```
-
-i musiała ręcznie ograniczać liczbę równoległych operacji.
-
----
-
-## Project Loom
-
-Project Loom to wieloletni projekt OpenJDK mający uprościć programowanie współbieżne.
-
-Jego najważniejszym elementem są Virtual Threads.
-
-Virtual Thread:
-
-* jest obiektem klasy `Thread`
-* zachowuje się jak zwykły wątek
-* nie jest bezpośrednio przypisany do wątku systemowego
-
-Tworzony jest przez JVM.
-
----
-
-## Tworzenie Virtual Thread
-
-Od Java 21:
-
-```java
-Thread.startVirtualThread(() -> {
-    System.out.println("Hello Virtual Thread");
+button.addActionListener(_ -> {
+    refreshData();
 });
 ```
 
-lub
+Podkreślenie informuje, że obiekt zdarzenia jest przekazywany przez API, ale nie jest wykorzystywany przez programistę.
+
+#### Przykład 2 – ignorowany wyjątek w bloku `catch`
+
+Przed:
 
 ```java
-Thread.Builder builder = Thread.ofVirtual();
-
-Thread thread = builder.start(() -> {
-    System.out.println("Hello");
-});
-```
-
----
-
-## Executor dla Virtual Threads
-
-Najczęściej używana forma:
-
-```java
-try (var executor =
-        Executors.newVirtualThreadPerTaskExecutor()) {
-
-    executor.submit(() -> {
-        Thread.sleep(Duration.ofSeconds(1));
-        return "Done";
-    });
+try {
+    processData();
+} catch (NumberFormatException ex) {
+    System.out.println("Niepoprawny format danych");
 }
 ```
 
-Każde zadanie otrzymuje własny Virtual Thread.
-
----
-
-## Dlaczego są szybsze?
-
-Virtual Thread nie oznacza szybszego wykonywania kodu.
-
-Oznacza możliwość uruchomienia ogromnej liczby operacji równolegle.
-
-Przykład:
+Po:
 
 ```java
-for (int i = 0; i < 1_000_000; i++) {
-    Thread.startVirtualThread(() -> {
-        Thread.sleep(Duration.ofSeconds(1));
-    });
+try {
+    processData();
+} catch (NumberFormatException _) {
+    System.out.println("Niepoprawny format danych");
 }
 ```
 
-Milion takich wątków jest realnie osiągalny.
+Ponieważ obiekt wyjątku nie jest używany (nie odczytujemy komunikatu ani stosu wywołań), można zastąpić go znakiem `_`, co wyraźnie 
+pokazuje intencję programisty.
 
-Dla klasycznych wątków byłoby to praktycznie niemożliwe.
 
----
-
-## Carrier Threads
-
-Virtual Threads wykonują się na niewielkiej liczbie prawdziwych wątków systemowych.
-
-Nazywamy je Carrier Threads.
-
-Schemat:
-
-Virtual Threads
-↓
-Carrier Threads
-↓
-System Operacyjny
-
-Dzięki temu JVM może efektywnie przełączać zadania bez angażowania systemu operacyjnego.
-
----
-
-## Kiedy Virtual Thread zostaje "odłączony"?
-
-Jeżeli wykonuje operację blokującą:
-
-```java
-Thread.sleep(...)
-Socket.read(...)
-HttpClient.send(...)
-```
-
-JVM odłącza Virtual Thread od Carrier Thread.
-
-Carrier Thread może obsługiwać inne zadania.
-
-Po zakończeniu operacji Virtual Thread zostaje ponownie podłączony.
-
-To właśnie daje ogromne korzyści wydajnościowe.
-
----
-
-## Zastosowania biznesowe
-
-Virtual Threads są idealne dla:
-
-* REST API
-* aplikacji Spring Boot
-* mikroserwisów
-* aplikacji komunikujących się z bazami danych
-* systemów kolejkowych
-* integracji z zewnętrznymi API
-
-Szczególnie tam, gdzie występuje dużo oczekiwania na I/O.
-
----
-
-## Zalety
-
-* bardzo prosty model programowania
-* brak callback hell
-* brak reaktywnego kodu w wielu przypadkach
-* ogromna skalowalność
-* pełna zgodność z istniejącym kodem
-
----
-
-## Ograniczenia
-
-Virtual Threads nie przyspieszają:
-
-* obliczeń CPU-intensive
-* algorytmów matematycznych
-* renderingu grafiki
-
-Największe korzyści pojawiają się przy operacjach I/O.
-
-# Structured Concurrency
-
-## Problem klasycznych Future
-
-Przez wiele lat programiści używali:
-
-```java
-Future<User> user = executor.submit(...);
-Future<Order> order = executor.submit(...);
-```
-
-Powodowało to kilka problemów:
-
-* trudne zarządzanie błędami
-* trudne anulowanie zadań
-* wycieki wątków
-* skomplikowany kod
-
-Przykład:
-
-```java
-Future<User> user = executor.submit(this::loadUser);
-Future<Account> account = executor.submit(this::loadAccount);
-
-User u = user.get();
-Account a = account.get();
-```
-
-Jeżeli jedno zadanie zakończy się błędem, drugie może nadal działać.
-
----
-
-## Idea Structured Concurrency
-
-Inspiracja pochodzi z:
-
-* Go
-* Kotlin Coroutines
-* Swift
-
-Założenie:
-
-„zadania uruchomione razem powinny kończyć się razem”.
-
----
-
-## Scope
-
-Tworzymy zakres współbieżności:
-
-```java
-try (var scope =
-         new StructuredTaskScope.ShutdownOnFailure()) {
-
-}
-```
-
-Wszystkie zadania należą do tego samego kontekstu.
-
----
-
-## Przykład
-
-```java
-try (var scope =
-         new StructuredTaskScope.ShutdownOnFailure()) {
-
-    var user =
-            scope.fork(this::loadUser);
-
-    var account =
-            scope.fork(this::loadAccount);
-
-    scope.join();
-    scope.throwIfFailed();
-
-    return new Result(
-            user.get(),
-            account.get()
-    );
-}
-```
-
----
-
-## Co daje join()
-
-```java
-scope.join();
-```
-
-Czeka na zakończenie wszystkich zadań.
-
----
-
-## Co daje throwIfFailed()
-
-```java
-scope.throwIfFailed();
-```
-
-Jeżeli którekolwiek zadanie zakończyło się błędem:
-
-* wyjątek zostanie zgłoszony
-* pozostałe zadania zostaną anulowane
-
----
-
-## ShutdownOnFailure
-
-Najpopularniejsza strategia.
-
-Jeżeli jedno zadanie zakończy się błędem:
-
-* pozostałe są automatycznie zatrzymywane
-
-To zachowanie jest zwykle pożądane w systemach biznesowych.
-
----
-
-## ShutdownOnSuccess
-
-Alternatywa:
-
-```java
-new StructuredTaskScope.ShutdownOnSuccess<>();
-```
-
-Pierwszy poprawny wynik kończy działanie pozostałych zadań.
-
-Przykład:
-
-* wyszukiwanie danych w wielu centrach danych
-* pobieranie z wielu serwerów cache
-
----
-
-## Powiązanie z Virtual Threads
-
-Structured Concurrency została zaprojektowana razem z Project Loom.
-
-Najczęściej każde zadanie działa jako osobny Virtual Thread.
-
-Dzięki temu:
-
-* kod pozostaje prosty
-* zachowana jest ogromna skalowalność
-
----
-
-## Zastosowania biznesowe
-
-Przykład agregacji danych:
-
-```text
-Pobierz użytkownika
-Pobierz zamówienia
-Pobierz płatności
-Pobierz historię logowania
-```
-
-Wszystkie operacje wykonywane są równolegle.
-
-Wynik zwracany jest dopiero po zakończeniu wszystkich zadań.
-
----
-
-## Zalety
-
-* prostsza obsługa błędów
-* automatyczne anulowanie
-* lepsza czytelność kodu
-* łatwiejsze debugowanie
-* naturalne połączenie z Virtual Threads
-
-A dla pozostałych tematów proponuję krótsze sekcje:
-
----
-
-## Scoped Values
-
-Warto pokazać:
-
-* czym różnią się od `ThreadLocal`,
-* dlaczego powstały wraz z Virtual Threads,
-* problem wycieków pamięci w `ThreadLocal`,
-* propagację kontekstu użytkownika.
-
-Minimalny przykład:
-
-```java
-private static final ScopedValue<String> USER =
-        ScopedValue.newInstance();
-
-ScopedValue.where(USER, "admin")
-        .run(() -> {
-            System.out.println(USER.get());
-        });
-```
-
-Najważniejszy przekaz:
-
-> Scoped Values są dla Virtual Threads tym, czym ThreadLocal był dla klasycznych wątków.
-
----
-
-# Garbage Collectors
+## Garbage Collectors
 
 ![gc.png](gc.png)
-
-
