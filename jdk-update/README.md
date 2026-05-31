@@ -859,7 +859,7 @@ URL url_new = URI.create("http://github.com").toURL();
 ```
 
 
-## Stream Gatherers (Rozszerzalne API strumieni)
+## Stream Gatherers (Rozszerzalne API strumieni lub "Zbieracz strumieni")
 
 Rewolucja w Stream API. Pozwala na definiowanie niestandardowych operacji pośrednich (*intermediate operations*), 
 których brakuje w standardowym API (np. okienkowanie, grupowanie w stałe paczki, transformacje stanowe). Pozwala tworzyć własne 
@@ -903,6 +903,77 @@ Wynik:
 [4, 5, 6]
 [7, 8, 9]
 ```
+
+
+### Przykład: zliczanie słów w strumieniu
+
+```java
+class WordCountGatherer implements Gatherer<String, Map<String, Integer>, Map<String, Integer>> {
+
+  @Override
+  public java.util.function.Supplier<Map<String, Integer>> initializer() {
+    return HashMap::new;
+  }
+
+  @Override
+  public Integrator<Map<String, Integer>, String, Map<String, Integer>> integrator() {
+    return (state, sentence, downstream) -> {
+      for (String word : sentence.split("\\s+")) {
+        word = word.toLowerCase().replaceAll("[^a-ząćęłńóśżź0-9]", "");
+        if (word.isEmpty()) continue;
+
+        state.merge(word, 1, Integer::sum);
+      }
+      return true;
+    };
+  }
+
+  @Override
+  public BiConsumer<Map<String, Integer>, Downstream<? super Map<String, Integer>>> finisher() {
+    return (state, downstream) -> downstream.push(state);
+  }
+
+  @Override
+  public BinaryOperator<Map<String, Integer>> combiner() {
+    return (left, right) -> {
+      right.forEach((k, v) -> left.merge(k, v, Integer::sum));
+      return left;
+    };
+  }
+}
+```
+
+
+
+```java
+List<String> sentences = List.of(
+        "Ala ma kota",
+        "Kot Ala lubi kota",
+        "Ala lubi programować w Javie"
+);
+
+Map<String, Integer> counts = sentences.stream()
+        .gather(new WordCountGatherer())
+        .findFirst()   // gatherer emituje 1 element: mapę
+        .orElse(Map.of());
+
+System.out.println(counts);
+```
+
+Wynik:
+
+```
+{ala=3, ma=1, kota=2, kot=1, lubi=2, programować=1, w=1, javie=1}
+```
+
+Dlaczego Gatherer jest tu idealny?
+
+- **Stan** (mapa słów) jest utrzymywany w trakcie przetwarzania.
+- **Integrator** może przetwarzać każde zdanie i aktualizować licznik.
+- **Finisher** emituje wynik dopiero na końcu.
+- **Combiner** umożliwia działanie w streamie równoległym.
+
+To jest dokładnie to, czego nie da się zrobić elegancko zwykłym `map`/`flatMap`.
 
 
 ## JDK 25
@@ -985,7 +1056,7 @@ class SubClass extends BaseClass {
 }
 ```
 
-### Nienazwane zmienne i wzorce (Unnamed Variables i Unnamed Patterns)
+### Reorganizacja importów (Module Import Declarations)
 
 #### Problem tradycyjnych importów
 
@@ -1044,28 +1115,11 @@ Przykładowo:
 | `java.xml`      | XML API                               |
 | `java.net.http` | HttpClient                            |
 
-#### Przykład
-
-Przed:
-
-```java
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Optional;
-```
-
-Po:
-
-```java
-import module java.base;
-```
-
 Wszystkie eksportowane klasy modułu stają się dostępne. W dużych projektach biznesowych nadal często preferowane będą klasyczne importy, 
 ponieważ pozwalają precyzyjnie kontrolować zależności i łatwiej analizować używane klasy.
 
 
-### Reorganizacja importów (Module Import Declarations)
+### Nienazwane zmienne i wzorce (Unnamed Variables i Unnamed Patterns)
 
 * **Unnamed Variables** pozwalają oznaczyć zmienną, której wartość nie będzie wykorzystywana w dalszej części programu.
 * Zamiast nadawać sztuczne nazwy takie jak `ignored`, `unused` czy `dummy`, programista może użyć pojedynczego znaku podkreślenia (`_`).
@@ -1074,45 +1128,19 @@ ponieważ pozwalają precyzyjnie kontrolować zależności i łatwiej analizowa�
 * Jest częścią projektu Project Amber, którego celem jest ograniczanie ilości kodu szablonowego (*boilerplate code*).
 * Funkcjonalność jest dostępna jako **Preview Feature od Java 22** (JEP 456).
 
-#### Przykład 1 – nieużywany parametr w wyrażeniu lambda
-
-Przed:
+#### Przykład – ignorowany wyjątek w bloku `catch`
 
 ```java
-button.addActionListener(event -> {
-    refreshData();
-});
-```
-
-Po:
-
-```java
-button.addActionListener(_ -> {
-    refreshData();
-});
-```
-
-Podkreślenie informuje, że obiekt zdarzenia jest przekazywany przez API, ale nie jest wykorzystywany przez programistę.
-
-#### Przykład 2 – ignorowany wyjątek w bloku `catch`
-
-Przed:
-
-```java
-try {
+void main() {
+  try {
     processData();
-} catch (NumberFormatException ex) {
+  } catch (NumberFormatException _) {
     System.out.println("Niepoprawny format danych");
+  }
 }
-```
 
-Po:
-
-```java
-try {
-    processData();
-} catch (NumberFormatException _) {
-    System.out.println("Niepoprawny format danych");
+void processData() throws NumberFormatException {
+  throw new NumberFormatException();
 }
 ```
 
